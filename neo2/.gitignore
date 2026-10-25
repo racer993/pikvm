@@ -1,0 +1,5 @@
+neo2/images/
+neo2-credentials.txt
+neo2-debian-credentials.txt
+*.img
+*.img.xz
