@@ -65,7 +65,7 @@ FDT_DIR=${NEO2_FDT_DIR:-/usr/lib/linux-image-}
 KEYRING=${NEO2_KEYRING:-}
 
 PACKAGES=(
-  systemd-sysv udev dbus kmod netbase iproute2 iputils-ping procps less nano
+  apt systemd-sysv udev dbus kmod netbase iproute2 iputils-ping procps less nano
   openssh-server openssh-sftp-server sudo
   systemd-timesyncd systemd-resolved avahi-daemon libnss-mdns
   ca-certificates locales tzdata
@@ -242,7 +242,7 @@ check_tools() {
   [[ ${#missing[@]} -eq 0 ]] || die "missing tools: ${missing[*]}"
   if [[ -z $KEYRING ]]; then
     for t in /usr/share/keyrings/debian-archive-keyring.gpg /usr/share/keyrings/debian-archive-keyring.pgp; do
-      [[ -f $t ]] && { KEYRING=$t; break; }
+      if [[ -f $t ]]; then KEYRING=$t; break; fi
     done
   fi
   [[ -n $KEYRING && -e $KEYRING ]] || die "Debian archive keyring not found (install debian-archive-keyring)"
@@ -609,7 +609,14 @@ in_chroot u-boot-update
 in_chroot systemctl enable systemd-networkd systemd-resolved systemd-timesyncd \
   ssh avahi-daemon neo2-ssh-hostkeys.service neo2-growroot.service \
   serial-getty@ttyS0.service
-in_chroot systemctl enable fake-hwclock.service || warn "fake-hwclock.service not found"
+# fake-hwclock >= 0.12 ships fake-hwclock-load.service + fake-hwclock-save.timer
+# (fake-hwclock.service is masked there); older versions ship fake-hwclock.service.
+fhc=()
+for u in fake-hwclock-load.service fake-hwclock-save.timer; do
+  if [[ -e $R/usr/lib/systemd/system/$u || -e $R/lib/systemd/system/$u ]]; then fhc+=("$u"); fi
+done
+[[ ${#fhc[@]} -gt 0 ]] || fhc=(fake-hwclock.service)
+in_chroot systemctl enable "${fhc[@]}" || warn "could not enable ${fhc[*]}"
 in_chroot systemctl mask systemd-firstboot.service >/dev/null 2>&1 || true
 
 # users + credentials
